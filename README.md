@@ -2,9 +2,11 @@
 
 > A Vue.js project
 >
-> sample.json是样例数据，原始给的数据存储时候，单引号改为双引号，文件格式只能为json再上传。
+> sample.json是样例数据。
 >
 > 该demo项目是纯前端项目，无后台未配置跨域。
+>
+>该项目使用了echarts构造树图，输入的数据格式为类树图数据结构的深度obj数据（属性较少版本，但是结构完整），可根据所用的输入json，调整代码的deepTraversal。
 
 ## Build Setup
 
