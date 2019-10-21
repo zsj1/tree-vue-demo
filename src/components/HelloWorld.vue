@@ -54,7 +54,8 @@ export default {
       dialogVisible: false, // 上传文件对话框是否可见参数
       treeData: null, // 生成树图的数据
       myTreeChart: null, // 树图变量
-      initialTreeDepth: 2 // 树初始展开层数
+      initialTreeDepth: 2, // 树初始展开层数
+      option: null // echarts图配置项
     };
   },
   methods: {
@@ -123,7 +124,8 @@ export default {
             name: key,
             ...this.getNodeStyle(keyList.length, key, true),
             children: [],
-            deep: keyList.length
+            deep: keyList.length,
+            expandStatus: keyList.length < this.initialTreeDepth ? true : false,
           };
         } else {
           // 利用指针定位到当前深度位置下的子obj以继续添加数据
@@ -146,14 +148,16 @@ export default {
               name: key,
               ...this.getNodeStyle(keyList.length, key, false),
               // deep参数是该节点的深度，可能有用，目前未用到
-              deep: keyList.length
+              deep: keyList.length,
+              expandStatus: keyList.length < this.initialTreeDepth ? true : false,
             });
           } else {
             deepObj.push({
               name: key,
               ...this.getNodeStyle(keyList.length, key, true),
               children: [],
-              deep: keyList.length
+              deep: keyList.length,
+              expandStatus: keyList.length < this.initialTreeDepth ? true : false,
             });
           }
         }
@@ -207,7 +211,7 @@ export default {
       span.style.display = "inline-block";
       document.body.appendChild(span);
       if (typeof span.textContent != "undefined") {
-        span.textContent = text;
+        span.textContent = text + '空格';
       } else {
         span.innerText = text;
       }
@@ -237,6 +241,7 @@ export default {
     },
     // 树图下载函数
     treeGraphDownload() {
+      this.myTreeChart.resize();
       setTimeout(function() {
         let myCanvas = $("#myTreeChart").find("canvas")[0];
         let image = myCanvas.toDataURL("image/jpeg");
@@ -272,7 +277,7 @@ export default {
       // 绘制过程加载loading
       this.myTreeChart.showLoading();
       // 生成配置项参数
-      let option = {
+      this.option = {
         backgroundColor: "#f6f6f6", // 背景色，与主body相同
         tooltip: {
           trigger: "item",
@@ -281,10 +286,10 @@ export default {
         series: [
           {
             type: "tree", // 绘制图的类型
-            roam: false, // 是否开启缩放和拖动，这里false是因为无法解决canvas在下载的时候只下载当前屏幕内容，若开启则可能导致下载图不完整，官方推荐策略也是不开启，目前官方文件未给出较好的缩放和拖拽外部api
+            roam: true, // 是否开启缩放和拖动，这里false是因为无法解决canvas在下载的时候只下载当前屏幕内容，若开启则可能导致下载图不完整，官方推荐策略也是不开启，目前官方文件未给出较好的缩放和拖拽外部api
             data: [this.treeData], // 绘图所用的数据
             // 距离上下左右容器的距离，default 12%过大，这里缩小下
-            top: "3%", 
+            top: "3%",
             left: "5%",
             bottom: "3%",
             right: "8%", // 有工具栏，所以稍大点
@@ -295,13 +300,21 @@ export default {
                 verticalAlign: "middle",
                 align: "center",
                 formatter: function(param) {
+                  let expandStatusIcon = "";
                   let name = "";
                   if (param.data.deep > 1 || !param.data.children) {
-                    name = "{black|" + param.name + "}";
+                    name = "{black|" + param.name + "  }";
                   } else {
-                    name = "{white|" + param.name + "}";
+                    name = "{white|" + param.name + "  }";
                   }
-                  return name;
+                  if (param.data.children) {
+                    if (param.data.expandStatus) {
+                      expandStatusIcon = "{icon|-}";
+                    } else {
+                      expandStatusIcon = "{icon|+}";
+                    }
+                  }
+                  return name + expandStatusIcon;
                 },
                 // 富文本样式
                 rich: {
@@ -314,22 +327,35 @@ export default {
                     color: "#ffffff",
                     fontFamily: "Arial",
                     fontSize: 12
+                  },
+                  icon: {
+                    width: 14,
+                    height: 14,
+                    color: "#ffffff",
+                    fontFamily: "Arial",
+                    fontSize: 16,
+                    backgroundColor: '#409eff',
+                    borderColor: '#003472',
+                    borderRadius: 7,
+                    // lineHeight: 14,
+                    borderWidth: 1,
                   }
                 }
               }
             },
             initialTreeDepth: this.initialTreeDepth, // 树图初始深度
-            expandAndCollapse: true,  // 子树折叠和展开的交互
+            expandAndCollapse: true, // 子树折叠和展开的交互
             animationDuration: 550, // 初始动画时间
             animationDurationUpdate: 750 // 图改变时重绘动画时间
           }
         ]
       };
       this.myTreeChart.clear();
-      setTimeout(this.myTreeChart.setOption(option), 500);
-      this.myTreeChart.hideLoading();
+      this.myTreeChart.setOption(this.option, true),
+        // setTimeout(this.myTreeChart.setOption(option, true), 500);
+        this.myTreeChart.hideLoading();
       // 自动关闭同层其他节点
-      // this.myTreeChart.on("mousedown", e => {
+      // this.myTreeChart.on("click", e => {
       //   const name = e.data.name;
       //   const curNode = this.myTreeChart._chartsViews[0]._data.tree._nodes.find(
       //     item => {
@@ -338,11 +364,13 @@ export default {
       //   );
       //   const depth = curNode.depth;
       //   const curIsExpand = curNode.isExpand;
-      //   this.myTreeChart._chartsViews[0]._data.tree._nodes.forEach((item, index) => {
-      //     if (item.depth === depth && item.name !== name && !curIsExpand) {
-      //       item.isExpand = false;
+      //   this.myTreeChart._chartsViews[0]._data.tree._nodes.forEach(
+      //     (item, index) => {
+      //       if (item.depth === depth && item.name !== name && !curIsExpand) {
+      //         item.isExpand = false;
+      //       }
       //     }
-      //   });
+      //   );
       // });
     }
   }
