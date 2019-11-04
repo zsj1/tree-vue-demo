@@ -7,8 +7,16 @@
       </el-header>
     </el-container>
     <!-- 操作echarts图的toolbox，这里是自定义样式和方法完成的，也可使用echarts配置项里的toolbox，就是比较丑 -->
-    <div class="toolbox">
+    <div class="toolbox" v-show="toolboxVisible">
       <ul>
+        <li @click="treeGraphChangeIsExpand(false)">
+          <i class="el-icon-remove-outline"></i>收起
+          <br />全部
+        </li>
+        <li @click="treeGraphChangeIsExpand(true)">
+          <i class="el-icon-circle-plus-outline"></i>展开
+          <br />全部
+        </li>
         <li @click="treeGraphRefresh">
           <i class="el-icon-refresh"></i>重置
         </li>
@@ -17,8 +25,20 @@
         </li>
       </ul>
     </div>
-    <!-- echarts图的containerDiv -->
-    <div id="myTreeChart"></div>
+    <el-tabs value="treeGraph" tab-position="left" v-show="tabVisible" @tab-click="handleTabClick">
+      <el-tab-pane name="rawData" label="原始数据">
+        <el-card class="box-card">
+          <div>
+            {{uploadFilename}}
+            <pre>{{uploadFileContent}}</pre>
+          </div>
+        </el-card>
+      </el-tab-pane>
+      <el-tab-pane name="treeGraph" label="树图">
+        <!-- echarts图的containerDiv -->
+        <div id="myTreeChart"></div>
+      </el-tab-pane>
+    </el-tabs>
     <!-- 选择json文件的对话框，弹框选择，腾出更多空间呈现echarts的图 -->
     <el-dialog title="Load JSON document from file" :visible.sync="dialogVisible">
       <el-upload
@@ -50,8 +70,11 @@ export default {
   data() {
     return {
       uploadFilename: null, // 当前上传文件名
+      uploadFileContent: null, // 当前上传文件内容
       uploadFiles: [], // 上传文件list
       dialogVisible: false, // 上传文件对话框是否可见参数
+      toolboxVisible: false, // 树图工具栏是否可见参数
+      tabVisible: false, // tab切换栏是否可见参数
       treeData: null, // 生成树图的数据
       myTreeChart: null, // 树图变量
       initialTreeDepth: 2, // 树初始展开层数
@@ -59,6 +82,10 @@ export default {
     };
   },
   methods: {
+    // 标签页点击切换触发函数
+    handleTabClick(tab, event) {
+      this.toolboxVisible = tab.name === "treeGraph" ? true : false;
+    },
     // 处理选择超过一个1个json文件的提示函数
     handleExceed(files, fileList) {
       this.$message.warning(
@@ -77,6 +104,11 @@ export default {
       if (this.uploadFiles) {
         // 重置绘图数据
         this.treeData = null;
+        // 隐藏tabs标签栏
+        this.tabVisible = false;
+        // 隐藏工具栏
+        this.toolboxVisible = false;
+        // 这里因为限制了传入一个json文件，多个文件的话逻辑需要修改
         for (let i = 0; i < this.uploadFiles.length; i++) {
           let file = this.uploadFiles[i];
           if (!file) continue;
@@ -85,12 +117,15 @@ export default {
           reader.onload = async e => {
             try {
               let document = JSON.parse(e.target.result);
+              this.uploadFileContent = document;
               // 使用递归深度遍历的方法，利用已有json数据，构造出生成树图的json数据
               this.handleJsonContent(document);
               // 利用生成的数据绘图
               this.drawTreeChart();
+              // 显示tabs标签栏
+              this.tabVisible = true;
               // 显示图工具栏
-              $("div.toolbox").css("display", "block");
+              this.toolboxVisible = true;
             } catch (err) {
               this.$message.error(
                 `Load JSON document from file error: ${err.message}`
@@ -125,7 +160,7 @@ export default {
             ...this.getNodeStyle(keyList.length, key, true),
             children: [],
             deep: keyList.length,
-            expandStatus: keyList.length < this.initialTreeDepth ? true : false,
+            expandStatus: keyList.length < this.initialTreeDepth ? true : false
           };
         } else {
           // 利用指针定位到当前深度位置下的子obj以继续添加数据
@@ -149,7 +184,8 @@ export default {
               ...this.getNodeStyle(keyList.length, key, false),
               // deep参数是该节点的深度，可能有用，目前未用到
               deep: keyList.length,
-              expandStatus: keyList.length < this.initialTreeDepth ? true : false,
+              expandStatus:
+                keyList.length < this.initialTreeDepth ? true : false
             });
           } else {
             deepObj.push({
@@ -157,7 +193,8 @@ export default {
               ...this.getNodeStyle(keyList.length, key, true),
               children: [],
               deep: keyList.length,
-              expandStatus: keyList.length < this.initialTreeDepth ? true : false,
+              expandStatus:
+                keyList.length < this.initialTreeDepth ? true : false
             });
           }
         }
@@ -211,7 +248,7 @@ export default {
       span.style.display = "inline-block";
       document.body.appendChild(span);
       if (typeof span.textContent != "undefined") {
-        span.textContent = text + '空格';
+        span.textContent = text + "空格";
       } else {
         span.innerText = text;
       }
@@ -233,7 +270,7 @@ export default {
         "height",
         window.innerHeight - headerHeight - bodyMargin
       );
-      $myTreeChart.css("width", window.innerWidth - bodyMargin);
+      $myTreeChart.css("width", window.innerWidth - bodyMargin - 96);
     },
     // 树图刷新函数
     treeGraphRefresh() {
@@ -250,6 +287,22 @@ export default {
         $a.setAttribute("download", "echarts图片");
         $a.click();
       }, 1000);
+    },
+    // 树图全部节点收起或者展开函数
+    treeGraphChangeIsExpand(status) {
+      // 注意这里两个属性一个是内置一个是外部添加的,需要对不同的数据进行修改
+      this.myTreeChart._chartsViews[0]._data.tree._nodes.forEach(
+        (item, index) => {
+          item.isExpand = status;
+        }
+      );
+      this.myTreeChart._chartsViews[0]._data._rawData._data.forEach(
+        (item, index) => {
+          item.expandStatus = status;
+        }
+      );
+      // 使用resize触发刷新
+      this.myTreeChart.resize();
     },
     // 绘制树图的主函数
     drawTreeChart() {
@@ -290,9 +343,9 @@ export default {
             data: [this.treeData], // 绘图所用的数据
             // 距离上下左右容器的距离，default 12%过大，这里缩小下
             top: "3%",
-            left: "5%",
+            left: "3%",
             bottom: "3%",
-            right: "8%", // 有工具栏，所以稍大点
+            right: "120px", // 为使得工具栏不重叠,改为固定px
             // 这里设置节点内文字样式，原本可在getNodeStyle配置化设置，但是除跟节点之外，在data中直接配置都是失效的，原因未查明
             label: {
               normal: {
@@ -334,11 +387,11 @@ export default {
                     color: "#ffffff",
                     fontFamily: "Arial",
                     fontSize: 16,
-                    backgroundColor: '#409eff',
-                    borderColor: '#003472',
+                    backgroundColor: "#409eff",
+                    borderColor: "#003472",
                     borderRadius: 7,
                     // lineHeight: 14,
-                    borderWidth: 1,
+                    borderWidth: 1
                   }
                 }
               }
@@ -351,27 +404,27 @@ export default {
         ]
       };
       this.myTreeChart.clear();
-      this.myTreeChart.setOption(this.option, true),
-        // setTimeout(this.myTreeChart.setOption(option, true), 500);
-        this.myTreeChart.hideLoading();
-      // 自动关闭同层其他节点
-      // this.myTreeChart.on("click", e => {
-      //   const name = e.data.name;
-      //   const curNode = this.myTreeChart._chartsViews[0]._data.tree._nodes.find(
-      //     item => {
-      //       return item.name === name;
-      //     }
-      //   );
-      //   const depth = curNode.depth;
-      //   const curIsExpand = curNode.isExpand;
-      //   this.myTreeChart._chartsViews[0]._data.tree._nodes.forEach(
-      //     (item, index) => {
-      //       if (item.depth === depth && item.name !== name && !curIsExpand) {
-      //         item.isExpand = false;
-      //       }
-      //     }
-      //   );
-      // });
+      this.myTreeChart.setOption(this.option, true);
+      // setTimeout(this.myTreeChart.setOption(option, true), 500);
+      this.myTreeChart.hideLoading();
+      // 修改expandStatus
+      this.myTreeChart.on("click", e => {
+        const name = e.data.name;
+        const curNode = this.myTreeChart._chartsViews[0]._data.tree._nodes.find(
+          item => {
+            return item.name === name;
+          }
+        );
+        this.myTreeChart._chartsViews[0]._data._rawData._data.forEach(
+          (item, index) => {
+            if (item.name === curNode.name && item.deep === (curNode.depth - 1)) {
+              item.expandStatus = !item.expandStatus;
+            }
+          }
+        );
+        // 使用resize触发刷新
+        this.myTreeChart.resize();
+      });
     }
   }
 };
@@ -381,9 +434,6 @@ export default {
 <style scoped>
 .el-header {
   line-height: 60px;
-}
-.toolbox {
-  display: none;
 }
 
 .toolbox ul {
