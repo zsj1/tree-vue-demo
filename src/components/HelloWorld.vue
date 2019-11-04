@@ -35,8 +35,10 @@
         </el-card>
       </el-tab-pane>
       <el-tab-pane name="treeGraph" label="树图">
-        <!-- echarts图的containerDiv -->
-        <div id="myTreeChart"></div>
+        <el-card class="box-card" :body-style="{ padding: '0px' }">
+          <!-- echarts图的containerDiv -->
+          <div id="myTreeChart"></div>
+        </el-card>
       </el-tab-pane>
     </el-tabs>
     <!-- 选择json文件的对话框，弹框选择，腾出更多空间呈现echarts的图 -->
@@ -268,7 +270,7 @@ export default {
       let headerHeight = parseInt($(".el-header").css("height"));
       $myTreeChart.css(
         "height",
-        window.innerHeight - headerHeight - bodyMargin
+        window.innerHeight - headerHeight - bodyMargin - 5
       );
       $myTreeChart.css("width", window.innerWidth - bodyMargin - 96);
     },
@@ -331,7 +333,7 @@ export default {
       this.myTreeChart.showLoading();
       // 生成配置项参数
       this.option = {
-        backgroundColor: "#f6f6f6", // 背景色，与主body相同
+        backgroundColor: "#fff", // 背景色
         tooltip: {
           trigger: "item",
           triggerOn: "mousemove"
@@ -345,7 +347,7 @@ export default {
             top: "3%",
             left: "3%",
             bottom: "3%",
-            right: "120px", // 为使得工具栏不重叠,改为固定px
+            right: "150px", // 为使得工具栏不重叠,改为固定px
             // 这里设置节点内文字样式，原本可在getNodeStyle配置化设置，但是除跟节点之外，在data中直接配置都是失效的，原因未查明
             label: {
               normal: {
@@ -466,5 +468,11 @@ export default {
   font-size: 20px;
   display: block;
   margin-bottom: 5px;
+}
+
+#myTreeChart {
+  /* border: 1px solid #EBEEF5;
+  background-color: #FFF;
+  color: #303133; */
 }
 </style>
